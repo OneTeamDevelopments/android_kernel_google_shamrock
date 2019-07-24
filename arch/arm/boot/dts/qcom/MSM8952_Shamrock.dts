@@ -21,10 +21,10 @@
 	#address-cells = <0x2>;
 	#size-cells = <0x2>;
 	model = "Qualcomm Technologies, Inc. MSM8952 MTP";
-	compatible = "qcom,msm8952-mtp", "qcom,msm8952", "qcom,mtp";
+	compatible = "qcom,msm8952-shamrock", "qcom,msm8952-mtp", "qcom,msm8952", "qcom,mtp";
 	qcom,msm-id = <0x108 0x0>;
 	interrupt-parent = <0x1>;
-	qcom,board-id = <0x8 0x0>;
+	qcom,board-id = <0xb 0x1>;
 
 	cpus {
 		#address-cells = <0x1>;
