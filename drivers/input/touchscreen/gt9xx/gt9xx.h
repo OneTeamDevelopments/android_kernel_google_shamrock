@@ -44,6 +44,8 @@
 struct goodix_ts_platform_data {
 	int irq_gpio;
 	u32 irq_gpio_flags;
+	int pwr_gpio;
+	u32 pwr_gpio_flags;
 	int reset_gpio;
 	u32 reset_gpio_flags;
 	const char *product_id;
@@ -97,6 +99,7 @@ struct goodix_ts_data {
 	u8  fixed_cfg;
 	u8  esd_running;
 	u8  fw_error;
+	u8  product_id_flag;
 	bool power_on;
 	struct mutex lock;
 	bool fw_loading;
@@ -109,6 +112,7 @@ struct goodix_ts_data {
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 	struct early_suspend early_suspend;
 #endif
+	struct proc_dir_entry *gtp_proc;
 	struct dentry *debug_base;
 };
 
@@ -117,7 +121,7 @@ extern u16 total_len;
 
 /***************************PART1:ON/OFF define*******************************/
 #define GTP_CUSTOM_CFG			0
-#define GTP_ESD_PROTECT			0
+#define GTP_ESD_PROTECT			1
 
 #define GTP_IRQ_TAB            {\
 				IRQ_TYPE_EDGE_RISING,\
@@ -130,8 +134,8 @@ extern u16 total_len;
 #define GTP_IRQ_TAB_RISING	0
 #define GTP_IRQ_TAB_FALLING	1
 #if GTP_CUSTOM_CFG
-#define GTP_MAX_HEIGHT		800
-#define GTP_MAX_WIDTH		480
+#define GTP_MAX_HEIGHT		1280
+#define GTP_MAX_WIDTH		720
 #define GTP_INT_TRIGGER		GTP_IRQ_TAB_RISING
 #else
 #define GTP_MAX_HEIGHT		4096
@@ -142,7 +146,7 @@ extern u16 total_len;
 #define GTP_PRODUCT_ID_MAXSIZE	5
 #define GTP_PRODUCT_ID_BUFFER_MAXSIZE	6
 #define GTP_FW_VERSION_BUFFER_MAXSIZE	4
-#define GTP_MAX_TOUCH		5
+#define GTP_MAX_TOUCH		10
 #define GTP_ESD_CHECK_CIRCLE	2000      /* jiffy: ms */
 
 /***************************PART3:OTHER define*********************************/
