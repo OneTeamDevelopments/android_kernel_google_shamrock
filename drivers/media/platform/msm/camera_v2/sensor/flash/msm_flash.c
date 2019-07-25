@@ -947,6 +947,7 @@ static int32_t msm_flash_get_dt_data(struct device_node *of_node,
 	struct msm_flash_ctrl_t *fctrl)
 {
 	int32_t rc = 0;
+	enum flash_type flashtype;
 
 	CDBG("called\n");
 
@@ -994,6 +995,15 @@ static int32_t msm_flash_get_dt_data(struct device_node *of_node,
 		pr_err("%s:%d msm_sensor_driver_get_gpio_data failed rc %d\n",
 			__func__, __LINE__, rc);
 		return rc;
+	}
+
+	rc = of_property_read_u32(of_node,
+			"qcom,flash-type", &flashtype);
+
+	if (rc == 0 && flashtype == GPIO_FLASH) {
+		fctrl->flash_driver_type = FLASH_DRIVER_GPIO;
+		CDBG("%s:%d x fctrl->flash_driver_type = %d", __func__, __LINE__,
+			fctrl->flash_driver_type);
 	}
 
 	if (fctrl->flash_driver_type == FLASH_DRIVER_DEFAULT)
