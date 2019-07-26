@@ -75,6 +75,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x100>;
+			clock-frequency = <0x626B5000>;
 			enable-method = "psci";
 			qcom,acc = <0xa>;
 			next-level-cache = <0xb>;
@@ -94,6 +95,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x101>;
+			clock-frequency = <0x626B5000>;
 			enable-method = "psci";
 			qcom,acc = <0xd>;
 			next-level-cache = <0xb>;
@@ -105,6 +107,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x102>;
+			clock-frequency = <0x626B5000>;
 			enable-method = "psci";
 			qcom,acc = <0xe>;
 			next-level-cache = <0xb>;
@@ -116,6 +119,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x103>;
+			clock-frequency = <0x626B5000>;
 			enable-method = "psci";
 			qcom,acc = <0xf>;
 			next-level-cache = <0xb>;
@@ -127,6 +131,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x0>;
+			clock-frequency = <0x5A688800>;
 			enable-method = "psci";
 			qcom,acc = <0x10>;
 			next-level-cache = <0x11>;
@@ -146,6 +151,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x1>;
+			clock-frequency = <0x5A688800>;
 			enable-method = "psci";
 			qcom,acc = <0x13>;
 			next-level-cache = <0x11>;
@@ -157,6 +163,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x2>;
+			clock-frequency = <0x5A688800>;
 			enable-method = "psci";
 			qcom,acc = <0x14>;
 			next-level-cache = <0x11>;
@@ -168,6 +175,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x3>;
+			clock-frequency = <0x5A688800>;
 			enable-method = "psci";
 			qcom,acc = <0x15>;
 			next-level-cache = <0x11>;
