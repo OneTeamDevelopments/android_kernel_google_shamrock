@@ -5658,7 +5658,7 @@
 							qcom,latency-us = <0x1>;
 							qcom,ss-power = <0x21c>;
 							qcom,energy-overhead = <0x16b60>;
-							qcom,time-overhead = <0x39>;
+							qcom,time-overhead = <0x51>;
 						};
 
 						qcom,pm-cpu-level@1 {
@@ -5666,9 +5666,9 @@
 							qcom,psci-cpu-mode = <0x2>;
 							qcom,spm-cpu-mode = "standalone_pc";
 							qcom,latency-us = <0xdd>;
-							qcom,ss-power = <0x1cc>;
+							qcom,ss-power = <0x21c>;
 							qcom,energy-overhead = <0x3596b>;
-							qcom,time-overhead = <0x190>;
+							qcom,time-overhead = <0xF1>;
 							qcom,use-broadcast-timer;
 							qcom,is-reset;
 						};
