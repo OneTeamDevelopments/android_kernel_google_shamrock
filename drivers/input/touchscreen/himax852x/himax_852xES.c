@@ -22,6 +22,10 @@
 #include "himax_fw.h"
 #endif
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
+
 #ifndef KEY_APP_SWITCH
 #define KEY_APP_SWITCH	580
 #endif
@@ -29,8 +33,6 @@
 #ifdef HX_SMART_WAKEUP
 #define HIMAX_GESTURE_PROC_FILE "gesture_open"
 static struct proc_dir_entry *gesture_proc = NULL;
-extern void qpnp_kernel_vib_enable(int value);
-extern int pa12200001_ps_state(void);
 #endif
 
 static int HX_TOUCH_INFO_POINT_CNT   = 0;
@@ -74,8 +76,12 @@ static bool iref_found = false;
 
 static u8 reset_active = false;
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+extern struct kobject *android_touch_kobj;
+#else
 #ifdef CONFIG_TOUCHSCREEN_HIMAX_DEBUG
 static struct kobject *android_touch_kobj = NULL;
+#endif
 #endif
 
 #if defined(CONFIG_FB)
@@ -592,7 +598,7 @@ static int himax_input_register(struct himax_ts_data *ts)
 	set_bit(KEY_MENU, ts->input_dev->keybit);
 	set_bit(KEY_SEARCH, ts->input_dev->keybit);
 #if defined(HX_SMART_WAKEUP)
-	set_bit(KEY_POWER, ts->input_dev->keybit);
+	if(dt2w_switch) set_bit(KEY_POWER, ts->input_dev->keybit);
 #endif	
 	set_bit(BTN_TOUCH, ts->input_dev->keybit);
 
@@ -1005,18 +1011,19 @@ static void himax_chip_reset(bool load_cfg, bool int_off)
 	}
 
 #ifdef HX_SMART_WAKEUP
-	if (atomic_read(&private_ts->suspend_mode) &&
-		private_ts->smwake_enable) {
+if(dt2w_switch) {
+	if (atomic_read(&private_ts->suspend_mode)) {
 		buf[0] = 0x8F;
 		buf[1] = 0x20;
 		ret = i2c_himax_master_write(private_ts->client, buf, 2,
 			HIMAX_I2C_RETRY_TIMES);
 		if (ret < 0)
 			pr_err("i2c write reg 0x8f failed %d\n", ret);
-		pr_info("reset done, back to wakeup mode\n");
-	} else {
-		pr_debug("reset done\n");
-	}
+			pr_info("reset done, back to wakeup mode\n");
+		} else {
+			pr_debug("reset done\n");
+		}
+}
 #endif
 
 	if (int_off)
@@ -1589,25 +1596,19 @@ static irqreturn_t himax_ts_thread(int irq, void *ptr)
 {
 #ifdef HX_SMART_WAKEUP
 	struct himax_ts_data *ts = ptr;
-	int ret;
 #endif
 
 #ifdef HX_SMART_WAKEUP
-	if (atomic_read(&ts->suspend_mode) && !FAKE_POWER_KEY_SEND &&
-		ts->smwake_enable) {
+	if (atomic_read(&ts->suspend_mode) && !FAKE_POWER_KEY_SEND && dt2w_switch == 1) {
 		wake_lock_timeout(&ts->smwake_wake_lock, 2*HZ);
 		if (himax_parse_wake_event((struct himax_ts_data *)ptr)) {
-			ret = pa12200001_ps_state();
-			if (ret == 0) {
-				pr_info("wakeup system\n");
-				input_report_key(ts->input_dev, KEY_POWER, 1);
-				input_sync(ts->input_dev);
-				msleep(20);
-				input_report_key(ts->input_dev, KEY_POWER, 0);
-				input_sync(ts->input_dev);
-				FAKE_POWER_KEY_SEND=true;
-				qpnp_kernel_vib_enable(50);
-			}
+			pr_info("wakeup system\n");
+			input_report_key(ts->input_dev, KEY_POWER, 1);
+			input_sync(ts->input_dev);
+			msleep(20);
+			input_report_key(ts->input_dev, KEY_POWER, 0);
+			input_sync(ts->input_dev);
+			FAKE_POWER_KEY_SEND=true;
 		}
 		return IRQ_HANDLED;
 	}
@@ -1633,7 +1634,7 @@ static int himax_ts_register_interrupt(struct i2c_client *client)
 		irq_enable_count = 1;
 		pr_info("request irq %d success\n", client->irq);
 #ifdef HX_SMART_WAKEUP
-		irq_set_irq_wake(client->irq, 1);
+		if(dt2w_switch) irq_set_irq_wake(client->irq, 1);
 #endif
 	} else {
 		ts->use_irq = 0;
@@ -2125,46 +2126,18 @@ static DEVICE_ATTR(tp_self_test, (S_IWUSR|S_IRUGO|S_IWUGO),
 	himax_chip_self_test_function, NULL);
 #endif
 
-#ifdef HX_SMART_WAKEUP
-static ssize_t himax_smart_wake_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct himax_ts_data *ts = private_ts;
-	size_t count = 0;
-	count = snprintf(buf, PAGE_SIZE, "%d\n", ts->smwake_enable);
-	return count;
-}
-
-static ssize_t himax_smart_wake_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct himax_ts_data *ts = private_ts;
-
-	if (sysfs_streq(buf, "0"))
-		ts->smwake_enable = false;
-	else if (sysfs_streq(buf, "1"))
-		ts->smwake_enable = true;
-	else
-		return -EINVAL;
-
-	pr_debug("enable = %d\n", ts->smwake_enable);
-
-	return count;
-}
-static DEVICE_ATTR(SMWP, (S_IWUSR|S_IRUGO|S_IWUGO),
-	himax_smart_wake_show, himax_smart_wake_store);
-#endif
-
 static int himax_touch_sysfs_init(void)
 {
 	int ret;
+
+#ifndef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
 	android_touch_kobj = kobject_create_and_add("android_touch", NULL);
 	if (android_touch_kobj == NULL) {
 		E("%s: subsystem_register failed\n", __func__);
 		ret = -ENOMEM;
 		return ret;
 	}
-
+#endif
 	ret = sysfs_create_file(android_touch_kobj, &dev_attr_vendor.attr);
 	if (ret) {
 		E("%s: sysfs_create_file dev_attr_vendor failed\n", __func__);
@@ -2201,14 +2174,6 @@ static int himax_touch_sysfs_init(void)
 	}
 	#endif
 
-	#ifdef HX_SMART_WAKEUP
-	ret = sysfs_create_file(android_touch_kobj, &dev_attr_SMWP.attr);
-	if (ret)  {
-		E("sysfs_create_file dev_attr_cover failed\n");
-		return ret;
-	}
-	#endif
-
 	return 0 ;
 }
 
@@ -2229,11 +2194,9 @@ static void himax_touch_sysfs_deinit(void)
 	sysfs_remove_file(android_touch_kobj, &dev_attr_tp_self_test.attr);
 	#endif
 
-	#ifdef HX_SMART_WAKEUP
-	sysfs_remove_file(android_touch_kobj, &dev_attr_SMWP.attr);
-	#endif
-
+#ifndef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
 	kobject_del(android_touch_kobj);
+#endif
 }
 #endif
 
@@ -2371,14 +2334,7 @@ static ssize_t himax_gesture_proc_write(struct file *file,
 		return -EFAULT;
 	}
 
-	if (atomic_read(&ts->suspend_mode) == 0) {
-		if (i == '1')
-			ts->smwake_enable = true;
-		else if(i == '0')
-			ts->smwake_enable = false;
-		else
-			return -EINVAL;
-	}
+	ts->smwake_enable = true;
 	return size;
 }
 static const struct file_operations himax_gesture_proc_fops= {
@@ -2531,7 +2487,7 @@ static int himax852xes_probe(struct i2c_client *client,
 #endif
 
 #ifdef HX_SMART_WAKEUP
-	ts->smwake_enable = false;
+	ts->smwake_enable = true;
 	wake_lock_init(&ts->smwake_wake_lock, WAKE_LOCK_SUSPEND,
 		HIMAX852XES_NAME);
 #endif
@@ -2639,7 +2595,7 @@ static int himax852xes_suspend(struct device *dev)
 
 	atomic_set(&ts->suspend_mode, 1);
 #ifdef HX_SMART_WAKEUP
-	if (ts->smwake_enable) {
+	if (dt2w_switch == 1 ) {
 		atomic_set(&ts->suspend_mode, 1);
 		ts->pre_finger_mask = 0;
 		FAKE_POWER_KEY_SEND = false;
@@ -2696,7 +2652,7 @@ static int himax852xes_resume(struct device *dev)
 
 	atomic_set(&ts->suspend_mode, 0);
 #ifdef HX_SMART_WAKEUP
-	if (ts->smwake_enable) {
+	if (dt2w_switch == 1 ) {
 		/* Sense Off */
 		i2c_himax_write_command(ts->client, 0x82,
 			HIMAX_I2C_RETRY_TIMES);
@@ -2713,6 +2669,8 @@ static int himax852xes_resume(struct device *dev)
 				ts->client->addr, (uint32_t)buf[0]);
 
 		msleep(50);
+	}else{
+		buf[0] = 0x00;
 	}
 #endif
 

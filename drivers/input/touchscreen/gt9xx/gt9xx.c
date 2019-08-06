@@ -54,6 +54,10 @@
 #include <linux/input/mt.h>
 #include <linux/debugfs.h>
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
+
 #define GOODIX_DEV_NAME	"Goodix-CTP"
 #define CFG_MAX_TOUCH_POINTS	5
 #define GOODIX_COORDS_ARR_SIZE	4
@@ -155,8 +159,14 @@ int gtp_i2c_read(struct i2c_client *client, u8 *buf, int len)
 			break;
 		dev_err(&client->dev, "I2C retry: %d\n", retries + 1);
 	}
+
 	if (retries == GTP_I2C_RETRY_5) {
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+		if (ts->pdata->slide_wakeup && dt2w_switch)
+#else
 		if (ts->pdata->slide_wakeup)
+#endif
+
 			/* reset chip would quit doze mode */
 			if (DOZE_ENABLED == doze_status)
 				return ret;
@@ -202,7 +212,11 @@ int gtp_i2c_write(struct i2c_client *client, u8 *buf, int len)
 		dev_err(&client->dev, "I2C retry: %d\n", retries + 1);
 	}
 	if ((retries == GTP_I2C_RETRY_5)) {
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+		if (ts->pdata->slide_wakeup && dt2w_switch)
+#else
 		if (ts->pdata->slide_wakeup)
+#endif
 			if (DOZE_ENABLED == doze_status)
 				return ret;
 
@@ -413,11 +427,15 @@ static void goodix_ts_work_func(struct work_struct *work)
 		return;
 #endif
 
-	if (ts->pdata->slide_wakeup) {
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+		if (ts->pdata->slide_wakeup && dt2w_switch) {
+#else
+		if (ts->pdata->slide_wakeup) {
+#endif
 		if (DOZE_ENABLED == doze_status) {
 			ret = gtp_i2c_read(ts->client, doze_buf, 3);
 			if (ret > 0) {
-				if (doze_buf[2] == 0xAA) {
+				if (doze_buf[2] == 0xAA || doze_buf[2] == 0xAB) {
 					dev_dbg(&ts->client->dev,
 						"Slide(0xAA) To Light up the screen!");
 					doze_status = DOZE_WAKEUP;
@@ -430,7 +448,7 @@ static void goodix_ts_work_func(struct work_struct *work)
 					/* clear 0x814B */
 					doze_buf[2] = 0x00;
 					gtp_i2c_write(ts->client, doze_buf, 3);
-				} else if (doze_buf[2] == 0xBB) {
+				} else if (doze_buf[2] == 0xBB || doze_buf[2] == 0xBA) {
 					dev_dbg(&ts->client->dev,
 						"Slide(0xBB) To Light up the screen!");
 					doze_status = DOZE_WAKEUP;
@@ -796,7 +814,12 @@ static s8 gtp_wakeup_sleep(struct goodix_ts_data *ts)
 				"Wakeup sleep send config success.");
 	} else {
 err_retry:
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+		if (ts->pdata->slide_wakeup && dt2w_switch) { /* wakeup not by slide */
+#else
 		if (ts->pdata->slide_wakeup) { /* wakeup not by slide */
+#endif
+
 			if (DOZE_WAKEUP != doze_status)
 				gtp_reset_guitar(ts, 10);
 			else
@@ -814,7 +837,11 @@ err_retry:
 		ret = gtp_i2c_test(ts->client);
 		if (ret == 2) {
 			dev_dbg(&ts->client->dev, "GTP wakeup sleep.");
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+			if (!ts->pdata->slide_wakeup && dt2w_switch) {
+#else
 			if (!ts->pdata->slide_wakeup) {
+#endif
 				if (chip_gt9xxs == 0) {
 					gtp_int_sync(ts, 25);
 					msleep(20);
@@ -1258,7 +1285,11 @@ static int gtp_request_input_dev(struct goodix_ts_data *ts)
 		}
 	}
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if (ts->pdata->slide_wakeup && dt2w_switch)
+#else
 	if (ts->pdata->slide_wakeup)
+#endif
 		input_set_capability(ts->input_dev, EV_KEY, KEY_POWER);
 
 	if (ts->pdata->with_pen) {  /* pen support */
@@ -1928,8 +1959,12 @@ static int goodix_parse_dt(struct device *dev,
 	pdata->with_pen = of_property_read_bool(np,
 						"goodix,with-pen");
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
 	pdata->slide_wakeup = of_property_read_bool(np,
 						"goodix,slide-wakeup");
+#else
+	pdata->slide_wakeup = false;
+#endif
 
 	pdata->dbl_clk_wakeup = of_property_read_bool(np,
 						"goodix,dbl_clk_wakeup");
@@ -2337,7 +2372,11 @@ static int goodix_ts_suspend(struct device *dev)
 	gtp_esd_switch(ts->client, SWITCH_OFF);
 #endif
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if (ts->pdata->slide_wakeup && dt2w_switch) {
+#else
 	if (ts->pdata->slide_wakeup) {
+#endif
 		ret = gtp_enter_doze(ts);
 	} else {
 		if (ts->use_irq)
@@ -2384,7 +2423,11 @@ static int goodix_ts_resume(struct device *dev)
 	mutex_lock(&ts->lock);
 	ret = gtp_wakeup_sleep(ts);
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if (ts->pdata->slide_wakeup && dt2w_switch)
+#else
 	if (ts->pdata->slide_wakeup)
+#endif
 		doze_status = DOZE_DISABLED;
 
 	if (ret <= 0)
