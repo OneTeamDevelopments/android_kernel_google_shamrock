@@ -1285,11 +1285,7 @@ static int gtp_request_input_dev(struct goodix_ts_data *ts)
 		}
 	}
 
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
-	if (ts->pdata->slide_wakeup && dt2w_switch)
-#else
 	if (ts->pdata->slide_wakeup)
-#endif
 		input_set_capability(ts->input_dev, EV_KEY, KEY_POWER);
 
 	if (ts->pdata->with_pen) {  /* pen support */

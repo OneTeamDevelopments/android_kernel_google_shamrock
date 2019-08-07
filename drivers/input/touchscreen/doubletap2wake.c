@@ -2,7 +2,8 @@
  * drivers/input/touchscreen/doubletap2wake.c
  *
  *
- * Copyright (c) 2013, Dennis Rassmann <showp1984@gmail.com>
+ * Copyright (c) 2013 Dennis Rassmann <showp1984@gmail.com>
+ * Copyright (c) 2013-19 Aaron Segaert <asegaert@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,91 +31,87 @@
 #include <linux/workqueue.h>
 #include <linux/input.h>
 #include <linux/hrtimer.h>
-#include <asm-generic/cputime.h>
 
-/* Version, author, desc, etc */
 #define DRIVER_AUTHOR "Caner Aydın <@caneray>"
 #define DRIVER_DESCRIPTION "Doubletap2wake for shamrock device"
-#define DRIVER_VERSION "1.0"
-#define LOGTAG "[oneteam-dt2w]: "
+#define DRIVER_VERSION "1.1"
 
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
-MODULE_VERSION(DRIVER_VERSION);
-MODULE_LICENSE("GPLv2");
+/* Tunables */
+#define DT2W_DEFAULT		0
 
 /* Resources */
-int dt2w_switch = 1;
-
-/* Read cmdline for dt2w */
-static int __init read_dt2w_cmdline(char *dt2w)
-{
-	if (strcmp(dt2w, "1") == 0) {
-		pr_info("[cmdline_dt2w]: DoubleTap2Wake enabled. | dt2w='%s'\n", dt2w);
-		dt2w_switch = 1;
-	} else if (strcmp(dt2w, "0") == 0) {
-		pr_info("[cmdline_dt2w]: DoubleTap2Wake disabled. | dt2w='%s'\n", dt2w);
-		dt2w_switch = 0;
-	} else {
-		pr_info("[cmdline_dt2w]: No valid input found. Going with default: | dt2w='%u'\n", dt2w_switch);
-	}
-	return 1;
-}
-__setup("dt2w=", read_dt2w_cmdline);
+int dt2w_switch = DT2W_DEFAULT;
 
 /*
  * SYSFS stuff below here
  */
-static ssize_t dt2w_doubletap2wake_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t doubletap2wake_show(struct kobject *kobj, struct kobj_attribute *attr,
+		      char *buf)
 {
-	size_t count = 0;
+	return snprintf(buf, PAGE_SIZE, "%d\n", dt2w_switch);
+}
 
-	count += sprintf(buf, "%d\n", dt2w_switch);
+static ssize_t doubletap2wake_store(struct kobject *kobj, struct kobj_attribute *attr,
+		       const char *buf, size_t count)
+{
+	int ret, val;
+	
+	ret = kstrtoint(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val < 0 || val > 1)
+		val = 0;
+
+	dt2w_switch = val;
 
 	return count;
 }
 
-static ssize_t dt2w_doubletap2wake_dump(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	if (buf[0] >= '0' && buf[0] <= '2' && buf[1] == '\n')
-                if (dt2w_switch != buf[0] - '0')
-		        dt2w_switch = buf[0] - '0';
+static struct kobj_attribute doubletap2wake_attribute =
+	__ATTR(doubletap2wake, 0664, doubletap2wake_show, doubletap2wake_store);
 
-	return count;
-}
+static struct attribute *attrs[] = {
+	&doubletap2wake_attribute.attr,
+	NULL,
+};
 
-static DEVICE_ATTR(doubletap2wake, (S_IWUSR|S_IRUGO),
-	dt2w_doubletap2wake_show, dt2w_doubletap2wake_dump);
+static struct attribute_group attr_group = {
+	.attrs = attrs,
+};
+
+struct kobject *android_touch_kobj;
+EXPORT_SYMBOL_GPL(android_touch_kobj);
 
 /*
  * INIT / EXIT stuff below here
  */
 
-struct kobject *android_touch_kobj;
-EXPORT_SYMBOL_GPL(android_touch_kobj);
-static int __init doubletap2wake_init(void)
+static int __init wake_gestures_init(void)
 {
 	int rc = 0;
 
-	android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
-	if (android_touch_kobj == NULL) {
-		pr_warn("%s: android_touch_kobj create_and_add failed\n", __func__);
+	pr_info("start wake gestures\n");
+
+	android_touch_kobj = kobject_create_and_add("android_touch", NULL);
+	if (!android_touch_kobj) {
+		pr_info("fail!!!!\n");
+		return -ENOMEM;
 	}
-	rc = sysfs_create_file(android_touch_kobj, &dev_attr_doubletap2wake.attr);
-	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for doubletap2wake\n", __func__);
-	}
+	rc = sysfs_create_group(android_touch_kobj, &attr_group);
+	if (rc)
+		pr_warn("%s: sysfs_create_group failed\n", __func__);
 
 	return 0;
 }
 
-static void __exit doubletap2wake_exit(void)
+static void __exit wake_gestures_exit(void)
 {
 	kobject_del(android_touch_kobj);
+
 	return;
 }
 
-module_init(doubletap2wake_init);
-module_exit(doubletap2wake_exit);
+module_init(wake_gestures_init);
+module_exit(wake_gestures_exit);
+
